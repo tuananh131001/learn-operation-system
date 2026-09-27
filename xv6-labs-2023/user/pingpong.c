@@ -12,46 +12,60 @@
 int
 main(int argc, char *argv[])
 {
-  int p[2];
-  const int BSIZE = 4;
-  char buf[BSIZE];
+  int p2c[2];
+  int c2p[2];
+  char buf[1];
 
   // creates an pipe for parent to child 
   
   // pipe for child to parent
-  pipe(p);
+  pipe(p2c);
+  pipe(c2p);
   int pid = fork(); // create child process and return child ID
   if (pid == 0) {
     // Child reads from pipe
-    close(p[1]);
-    read(p[0], buf, BSIZE);
-    fprintf(2, "%d: received ping\n", getpid());
-    close(p[0]);
+    close(p2c[1]);
+    if(read(p2c[0], buf, 1) > 1) {
+      fprintf(2, "child: failed to received ping\n");
+      exit(1);
+    }
+    close(p2c[0]);
+
+    fprintf(1, "%d: received ping\n", getpid());
+
+    // child write to pipe
+    close(c2p[0]);
+    if(write(c2p[0], buf, 1) > 1) {
+      fprintf(2, "child: failed to write\n");
+      exit(1);
+    }
+    close(c2p[1]);
+
+    exit(0);
   } else {
     // parent write to pipe
-    close(p[0]); // close the reads show the parent can write to 1
-    write(p[1], "A", 16);
-    close(p[1]);
+    close(p2c[0]); // close the reads show the parent can write to 1
+    
+    if(write(p2c[1], "x", 1) > 1) {
+      fprintf(2, "parent: failed to write to pipe\n");
+      exit(1);
+    }
+    close(p2c[1]);
+
+    // parent read from pipe
+    close(c2p[1]);
+    if (read(c2p[0], buf, 1) > 1) {
+      fprintf(2, "parent: failed to read ping\n");
+      exit(1);
+    }
+    fprintf(1, "%d: received pong\n", getpid());
+
+    close(c2p[0]);
+
     wait(0);
+    exit(0);
   }
 
-  int np[2];
-  char nbuf[16];
-  pipe(np);
 
-  if (pid == 0) {
-    //child write to pipe
-    close(np[0]);
-    write(np[1], "A", 16);
-    close(np[1]);
-    wait(0);
-  } else {
-    //parent read from pipe
-    close(np[0]);
-    read(np[0], nbuf, 16);
-    fprintf(2, "%d: received pong\n", getpid());
-    close(np[0]);
-  }
-  exit(0);
 
 }
